@@ -1,0 +1,7 @@
+version: "2"
+linters:
+  settings:
+    errcheck:
+      # A failed write to the output stream is not worth acting on.
+      exclude-functions:
+        - fmt.Fprintf

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/cli/go-gh/v2"
@@ -64,9 +65,20 @@ func (g *ghClient) UpdateRef(repo, branch, sha string) error {
 	path := fmt.Sprintf("repos/%s/git/refs/heads/%s", repo, branch)
 	body := strings.NewReader(fmt.Sprintf(`{"sha":%q,"force":false}`, sha))
 	if err := g.rest.Patch(path, body, nil); err != nil {
-		return apiError(err)
+		return updateRefError(err)
 	}
 	return nil
+}
+
+// updateRefError is apiError with a hint for the bare 404 that GitHub returns
+// when the head changes workflow files and the token lacks the workflow scope.
+func updateRefError(err error) error {
+	var httpErr *api.HTTPError
+	if !errors.As(err, &httpErr) || httpErr.StatusCode != http.StatusNotFound {
+		return apiError(err)
+	}
+	return &Error{Code: 2, Msg: apiError(err).Error() +
+		"\nif the pull request changes files in .github/workflows, the token needs the workflow scope: gh auth refresh -s workflow"}
 }
 
 func (g *ghClient) DeleteRef(repo, branch string) error {

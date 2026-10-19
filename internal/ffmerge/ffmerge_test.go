@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/cli/go-gh/v2/pkg/api"
 )
 
 // fakeClient records what Run asks of the API and replays canned answers.
@@ -195,6 +197,20 @@ func TestViewErrorStops(t *testing.T) {
 	c := &fakeClient{viewErr: &Error{Code: 1, Msg: "no pull requests found"}}
 	if _, err := run(t, c, Options{}); err == nil {
 		t.Fatal("Run: want an error")
+	}
+}
+
+func TestUpdateRefErrorHintsWorkflowScope(t *testing.T) {
+	err := updateRefError(&api.HTTPError{StatusCode: 404, Message: "Not Found"})
+	if !strings.Contains(err.Error(), "Not Found") || !strings.Contains(err.Error(), "gh auth refresh -s workflow") {
+		t.Errorf("err = %q, want the API message and the workflow hint", err)
+	}
+	if got := ExitCode(err); got != 2 {
+		t.Errorf("ExitCode = %d, want 2", got)
+	}
+	err = updateRefError(&api.HTTPError{StatusCode: 422, Message: "Update is not a fast forward"})
+	if strings.Contains(err.Error(), "workflow") {
+		t.Errorf("err = %q, want no workflow hint", err)
 	}
 }
 
